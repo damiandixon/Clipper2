@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  16 June 2022                                                    *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  21 June 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -899,10 +899,10 @@ namespace Clipper2Lib {
 		{
 			if (fillrule_ == fillpos)
 			{
-				if (e.wind_cnt != -1) return false;
+				if (e.wind_cnt != 1) return false;
 			}
 			else /*(fillrule_ == fillneg)*/ 
-				if (e.wind_cnt != 1) return false;
+				if (e.wind_cnt != -1) return false;
 		}
 		}
 
@@ -916,9 +916,9 @@ namespace Clipper2Lib {
 				return (e.wind_cnt2 != 0);
 			default:
 				if (fillrule_ == fillpos) 
-					return (e.wind_cnt2 < 0);
-				else 
 					return (e.wind_cnt2 > 0);
+				else 
+					return (e.wind_cnt2 < 0);
 			}
 			break;
 
@@ -945,9 +945,9 @@ namespace Clipper2Lib {
 					return (e.wind_cnt2 == 0);
 				default:
 					if (fillrule_ == fillpos)
-						return (e.wind_cnt2 >= 0);
-					else
 						return (e.wind_cnt2 <= 0);
+					else
+						return (e.wind_cnt2 >= 0);
 				}
 			else
 				switch (fillrule_)
@@ -957,9 +957,9 @@ namespace Clipper2Lib {
 					return (e.wind_cnt2 != 0);
 				default:
 					if (fillrule_ == fillpos)
-						return (e.wind_cnt2 < 0);
-					else
 						return (e.wind_cnt2 > 0);
+					else
+						return (e.wind_cnt2 < 0);
 				}
 			break;
 
@@ -1432,7 +1432,12 @@ namespace Clipper2Lib {
 		if (IsFront(e1) == IsFront(e2))
 		{
 			if (IsOpen(e1))
-				SwapSides(*e2.outrec);
+			{
+				if(e1.wind_dx < 0)
+					SwapSides(*e2.outrec);
+				else
+					SwapSides(*e1.outrec);
+			}
 			else if (!FixSides(e1, e2))
 			{
 				succeeded_ = false;
@@ -1451,6 +1456,13 @@ namespace Clipper2Lib {
 			result = outrec.pts;
 		}
 		//and to preserve the winding orientation of outrec ...
+		else if (IsOpen(e1))
+		{
+			if (e1.wind_dx < 0)
+				JoinOutrecPaths(e1, e2);
+			else
+				JoinOutrecPaths(e2, e1);
+		}
 		else if (e1.outrec->idx < e2.outrec->idx)
 			JoinOutrecPaths(e1, e2);
 		else
@@ -1781,8 +1793,18 @@ namespace Clipper2Lib {
 		outrec->state = OutRecState::Open;
 		outrec->pts = nullptr;
 		outrec->polypath = nullptr;
-		outrec->back_edge = nullptr;
-		outrec->front_edge = nullptr;
+
+		if (e.wind_dx > 0)
+		{
+			outrec->front_edge = &e;
+			outrec->back_edge = nullptr;
+		}
+		else
+		{
+			outrec->front_edge = nullptr;
+			outrec->back_edge =& e;
+		}
+
 		e.outrec = outrec;
 
 		OutPt* op = new OutPt(pt, outrec);
@@ -1909,13 +1931,13 @@ namespace Clipper2Lib {
 		default:
 			if (fillrule_ == fillpos)
 			{
-				old_e1_windcnt = -e1.wind_cnt;
-				old_e2_windcnt = -e2.wind_cnt;
+				old_e1_windcnt = e1.wind_cnt;
+				old_e2_windcnt = e2.wind_cnt;
 			}
 			else
 			{
-				old_e1_windcnt = e1.wind_cnt;
-				old_e2_windcnt = e2.wind_cnt;
+				old_e1_windcnt = -e1.wind_cnt;
+				old_e2_windcnt = -e2.wind_cnt;
 			}
 			break;
 		}
@@ -1998,13 +2020,13 @@ namespace Clipper2Lib {
 			default:
 				if (fillrule_ == fillpos)
 				{
-					e1Wc2 = -e1.wind_cnt2;
-					e2Wc2 = -e2.wind_cnt2;
+					e1Wc2 = e1.wind_cnt2;
+					e2Wc2 = e2.wind_cnt2;
 				}
 				else
 				{
-					e1Wc2 = e1.wind_cnt2;
-					e2Wc2 = e2.wind_cnt2;
+					e1Wc2 = -e1.wind_cnt2;
+					e2Wc2 = -e2.wind_cnt2;
 				}
 				break;
 			}
@@ -2501,7 +2523,15 @@ namespace Clipper2Lib {
 			//check if we've finished with (consecutive) horizontals ...
 			if (horzIsOpen && IsOpenEnd(horz)) //ie open at top
 			{
-				if (IsHotEdge(horz))  AddOutPt(horz, horz.top);
+				if (IsHotEdge(horz))
+				{
+					AddOutPt(horz, horz.top);
+					if (IsFront(horz))
+						horz.outrec->front_edge = nullptr; 
+					else
+						horz.outrec->back_edge = nullptr;
+					horz.outrec = nullptr;
+				}
 				DeleteFromAEL(horz); 
 				return;
 			}
@@ -2598,7 +2628,14 @@ namespace Clipper2Lib {
 			if (IsHotEdge(e)) AddOutPt(e, e.top);
 			if (!IsHorizontal(e))
 			{
-				if (IsHotEdge(e)) e.outrec = nullptr;
+				if (IsHotEdge(e))
+				{
+					if (IsFront(e))
+						e.outrec->front_edge = nullptr;
+					else
+						e.outrec->back_edge = nullptr;
+					e.outrec = nullptr;
+				}
 				DeleteFromAEL(e);
 			}
 			return next_e;
@@ -3360,7 +3397,7 @@ namespace Clipper2Lib {
 				Path64 path;
 				//closed paths should always return a Positive orientation
 				if (BuildPath(outrec->pts, 
-					ReverseSolution == orientation_is_reversed_, false, path))
+					ReverseSolution != orientation_is_reversed_, false, path))
 					solutionClosed.emplace_back(std::move(path));
 				path.resize(0);
 			}
@@ -3373,53 +3410,61 @@ namespace Clipper2Lib {
 			return PointInPolyResult::IsOutside;
 		
 		int val = 0;
-		OutPt* prev = ops->prev, *curr = ops;
+		OutPt *curr = ops, *prev = curr->prev;
+		
+		prev->next = nullptr; //temporary!!!
+		bool is_above = prev->pt.y < pt.y;
 		do
 		{
-			if (prev->pt.y == curr->pt.y) //a horizontal edge
+			if (is_above)
 			{
-				if (pt.y == curr->pt.y &&
-					(pt.x == prev->pt.x || pt.x == curr->pt.x ||
-					(pt.x < prev->pt.x) != (pt.x < curr->pt.x)))
-						return PointInPolyResult::IsOn;
-			}
-			else if (prev->pt.y < curr->pt.y)
-			{
-				//nb: only allow one equality with Y to avoid 
-				//double counting when pt.Y == ptCurr.Pt.Y
-				if (pt.y > prev->pt.y && pt.y <= curr->pt.y &&
-					((pt.x >= prev->pt.x || pt.x >= curr->pt.x)))
-				{
-					if (pt.x > prev->pt.x && pt.x > curr->pt.x)
-						val = 1 - val; //toggles val between 0 and 1
-					else
-					{
-						double d = CrossProduct(prev->pt, curr->pt, pt);
-						if (d == 0) return PointInPolyResult::IsOn;
-						else if (d > 0) val = 1 - val;
-					}
-				}
+				while (curr && curr->pt.y < pt.y) curr = curr->next;
+				if (!curr) break;
 			}
 			else
 			{
-				if (pt.y > curr->pt.y && pt.y <= prev->pt.y &&
-					(pt.x >= curr->pt.x || pt.x >= prev->pt.x))
-				{
-					if (pt.x > prev->pt.x && pt.x > curr->pt.x)
-						val = 1 - val; //toggles val between 0 and 1
-					else
-					{
-						double d = CrossProduct(curr->pt, prev->pt, pt);
-						if (d == 0) return PointInPolyResult::IsOn;
-						else if (d > 0) val = 1 - val;
-					}
-				}
+				while (curr && curr->pt.y > pt.y) curr = curr->next;
+				if (!curr) break;
 			}
-			prev = curr;
-			curr = curr->next;
-		} while (curr != ops);
+			prev = curr->prev;
 
-		return val == 0 ? PointInPolyResult::IsOutside : PointInPolyResult::IsInside;
+			if (curr->pt.y == pt.y)
+			{
+				if (curr->pt.x == pt.x || (curr->pt.y == prev->pt.y &&
+					((pt.x < prev->pt.x) != (pt.x < curr->pt.x))))
+				{
+					ops->prev->next = ops; //reestablish the link
+					return PointInPolyResult::IsOn;
+				}
+				curr = curr->next;
+				continue;
+			}
+
+			if (pt.x < curr->pt.x && pt.x < prev->pt.x)
+			{
+				//we're only interested in edges crossing on the left
+			}
+			else if (pt.x > prev->pt.x && pt.x > curr->pt.x)
+				val = 1 - val; //toggle val
+			else
+			{
+				double d = CrossProduct(prev->pt, curr->pt, pt);
+				if (d == 0)
+				{
+					ops->prev->next = ops; //reestablish the link
+					return PointInPolyResult::IsOn;
+				}
+				if ((d < 0) == is_above) val = 1 - val;
+			}
+			is_above = !is_above;
+			curr = curr->next;
+
+		} while (curr);
+
+		ops->prev->next = ops; //reestablish the link
+		return val == 0 ? 
+			PointInPolyResult::IsOutside : 
+			PointInPolyResult::IsInside;
 	}
 
 	bool Path1InsidePath2(OutPt* op1, OutPt* op2)
@@ -3483,7 +3528,7 @@ namespace Clipper2Lib {
 			Path64 path;
 			//closed paths should always return a Positive orientation
 			if (!BuildPath(outrec->pts,
-				ReverseSolution == orientation_is_reversed_, false, path)) continue;
+				ReverseSolution != orientation_is_reversed_, false, path)) continue;
 
 			if (outrec->owner && outrec->owner->state == outrec->state)
 				outrec->owner = outrec->owner->owner;

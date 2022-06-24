@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  16 June 2022                                                    *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  20 June 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Polygon offsetting                                              *
@@ -51,7 +51,6 @@ private:
 	bool merge_groups_ = true;
 	bool preserve_collinear_ = false;
 	bool reverse_solution_ = false;
-	bool reverse_orientation_ = false;
 
 	void DoSquare(PathGroup& group, const Path64& path, size_t j, size_t k);
 	void DoMiter(PathGroup& group, const Path64& path, size_t j, size_t k, double cos_a);
@@ -66,12 +65,10 @@ public:
 	ClipperOffset(double miter_limit = 2.0,
 		double arc_tolerance = 0.0,
 		bool preserve_collinear = false, 
-		bool reverse_solution = false,
-		bool reverse_orientation = DEFAULT_ORIENTATION_IS_REVERSED) :
+		bool reverse_solution = false) :
 		miter_limit_(miter_limit), arc_tolerance_(arc_tolerance),
 		preserve_collinear_(preserve_collinear),
-		reverse_solution_(reverse_solution),
-		reverse_orientation_(reverse_orientation) { (void)reverse_orientation_; };
+		reverse_solution_(reverse_solution) { };
 
 	~ClipperOffset() { Clear(); };
 

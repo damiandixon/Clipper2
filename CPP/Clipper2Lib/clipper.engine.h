@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  16 June 2022                                                    *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  20 June 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -356,10 +356,6 @@ namespace Clipper2Lib {
 
 	};
 
-#ifdef __clang__
-# pragma clang diagnostic push
-# pragma clang diagnostic ignored "-Woverloaded-virtual"
-#endif
 
 	void Polytree64ToPolytreeD(const PolyPath64& polytree, PolyPathD& result);
 
@@ -454,10 +450,6 @@ namespace Clipper2Lib {
 		}
 
 	};
-#ifdef __clang__
-# pragma clang diagnostic pop
-#endif
-
 
 	using Clipper = Clipper64;
 

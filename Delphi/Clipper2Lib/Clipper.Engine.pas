@@ -2,8 +2,8 @@ unit Clipper.Engine;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  16 June 2022                                                    *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  21 June 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -157,7 +157,6 @@ type
     FCurrentLocMinIdx   : Integer;
     FClipType           : TClipType;
     FFillRule           : TFillRule;
-    FUsingPolytree      : Boolean;
     FPreserveCollinear  : Boolean;
     FIntersectList      : TList;
     FOutRecList         : TList;
@@ -232,6 +231,7 @@ type
     procedure CleanCollinear(outRec: POutRec);
     procedure FixSelfIntersects(var op: POutPt);
   protected
+    FUsingPolytree : Boolean;
     procedure AddPath(const path: TPath64;
       pathType: TPathType; isOpen: Boolean);
     procedure AddPaths(const paths: TPaths64;
@@ -365,6 +365,9 @@ type
     property  Scale: double read FScale;
   end;
 
+resourcestring
+  rsClipper_RoundingErr = 'The decimal rounding value is invalid';
+
 implementation
 
 //OVERFLOWCHECKS OFF is a necessary workaround for a compiler bug that very
@@ -375,7 +378,6 @@ implementation
 resourcestring
   rsClipper_PolyTreeErr = 'The TPolyTree parameter must be assigned.';
   rsClipper_ClippingErr = 'Undefined clipping error';
-  rsClipper_RoundingErr = 'The decimal rounding value is invalid';
 
 const
   DefaultClipperDScale = 100;
@@ -859,8 +861,8 @@ begin
     op2 := op2.Next;
   until op2 = op;
   if reverseOrientation then
-    Result := Result * 0.5 else
-    Result := Result * -0.5;
+    Result := Result * -0.5 else
+    Result := Result * 0.5;
 end;
 //------------------------------------------------------------------------------
 
@@ -876,8 +878,8 @@ begin
   d5 := (pt2.y + pt3.y);
   d6 := (pt2.x - pt3.x);
   if reverseOrientation then
-    result := d1 * d2 + d3 *d4 + d5 *d6 else
-    result := -(d1 * d2 + d3 *d4 + d5 *d6);
+    result := -(d1 * d2 + d3 *d4 + d5 *d6) else
+    result := d1 * d2 + d3 *d4 + d5 *d6;
 end;
 //------------------------------------------------------------------------------
 
@@ -906,7 +908,8 @@ begin
   e2 := e.PrevInAEL;
   while assigned(e2) do
   begin
-    if IsHotEdge(e2) and not IsOpen(e2) then isOuter := not isOuter;
+    if IsHotEdge(e2) and not IsOpen(e2) then
+      isOuter := not isOuter;
     e2 := e2.PrevInAEL;
   end;
 
@@ -938,7 +941,8 @@ procedure SwapFrontBackSides(outRec: POutRec); {$IFDEF INLINING} inline; {$ENDIF
 var
   e2: PActive;
 begin
-  //this proc. is almost never needed
+  //while this proc. is needed for open paths
+  //it's almost never needed for closed paths
   e2 := outRec.FrontE;
   outRec.FrontE := outRec.BackE;
   outRec.BackE := e2;
@@ -958,6 +962,7 @@ begin
     outRec.State := osOpen;
     Exit;
   end;
+
   //set owner ...
   if IsHeadingLeftHorz(e) then
   begin
@@ -1503,9 +1508,9 @@ begin
     frPositive, frNegative:
       if FFillRule = FFillPos then
       begin
-        if (e.WindCnt <> -1) then Exit;
-      end else
         if (e.WindCnt <> 1) then Exit;
+      end else
+        if (e.WindCnt <> -1) then Exit;
   end;
 
   case FClipType of
@@ -1514,16 +1519,16 @@ begin
         frEvenOdd, frNonZero: Result := (e.WindCnt2 <> 0);
       else
         if FFillRule = FFillPos then
-          Result := (e.WindCnt2 < 0) else
-          Result := (e.WindCnt2 > 0);
+          Result := (e.WindCnt2 > 0) else
+          Result := (e.WindCnt2 < 0);
       end;
     ctUnion:
       case FFillRule of
         frEvenOdd, frNonZero: Result := (e.WindCnt2 = 0);
       else
         if FFillRule = FFillPos then
-          Result := (e.WindCnt2 >= 0) else
-          Result := (e.WindCnt2 <= 0);
+          Result := (e.WindCnt2 <= 0) else
+          Result := (e.WindCnt2 >= 0);
       end;
     ctDifference:
       if GetPolyType(e) = ptSubject then
@@ -1531,16 +1536,16 @@ begin
           frEvenOdd, frNonZero: Result := (e.WindCnt2 = 0);
         else
           if FFillRule = FFillPos then
-            Result := (e.WindCnt2 >= 0) else
-            Result := (e.WindCnt2 <= 0);
+            Result := (e.WindCnt2 <= 0) else
+            Result := (e.WindCnt2 >= 0);
         end
       else
         case FFillRule of
           frEvenOdd, frNonZero: Result := (e.WindCnt2 <> 0);
         else
           if FFillRule = FFillPos then
-            Result := (e.WindCnt2 < 0) else
-            Result := (e.WindCnt2 > 0);
+            Result := (e.WindCnt2 > 0) else
+            Result := (e.WindCnt2 < 0);
         end;
     ctXor:
         Result := true;
@@ -2091,7 +2096,9 @@ begin
   if (IsFront(e1) = IsFront(e2)) then
   begin
     if IsOpen(e1) then
-      SwapFrontBackSides(e2.OutRec)
+    begin
+      SwapFrontBackSides(e2.OutRec);
+    end
     else if not FixSides(e1, e2) then
     begin
       FSucceeded := false;
@@ -2110,8 +2117,15 @@ begin
     Result := outRec.Pts;
   end
   //and to preserve the winding orientation of Outrec ...
+  else if IsOpen(e1) then
+  begin
+    if e1.WindDx < 0 then
+      JoinOutrecPaths(e1, e2) else
+      JoinOutrecPaths(e2, e1);
+  end
   else if e1.OutRec.Idx < e2.OutRec.Idx then
-    JoinOutrecPaths(e1, e2) else
+    JoinOutrecPaths(e1, e2)
+  else
     JoinOutrecPaths(e2, e1);
 end;
 //------------------------------------------------------------------------------
@@ -2714,8 +2728,15 @@ begin
   newOr.Pts := nil;
   newOr.Split := nil;
   newOr.PolyPath := nil;
-  newOr.FrontE := e;
-  newOr.BackE := nil;
+  if e.WindDx > 0 then
+  begin
+    newOr.FrontE := e;
+    newOr.BackE := nil;
+  end else
+  begin
+    newOr.FrontE := nil;
+    newOr.BackE := e;
+  end;
   e.OutRec := newOr;
 
   new(Result);
@@ -2828,12 +2849,12 @@ begin
       begin
         if FFillRule = FFillPos then
         begin
-          e1WindCnt := -e1.WindCnt;
-          e2WindCnt := -e2.WindCnt;
-        end else
-        begin
           e1WindCnt := e1.WindCnt;
           e2WindCnt := e2.WindCnt;
+        end else
+        begin
+          e1WindCnt := -e1.WindCnt;
+          e2WindCnt := -e2.WindCnt;
         end;
       end;
   end;
@@ -2909,12 +2930,12 @@ begin
         begin
           if FFillRule = FFillPos then
           begin
-            e1WindCnt2 := -e1.WindCnt2;
-            e2WindCnt2 := -e2.WindCnt2;
-          end else
-          begin
             e1WindCnt2 := e1.WindCnt2;
             e2WindCnt2 := e2.WindCnt2;
+          end else
+          begin
+            e1WindCnt2 := -e1.WindCnt2;
+            e2WindCnt2 := -e2.WindCnt2;
           end;
         end;
     end;
@@ -3682,7 +3703,13 @@ begin
     if horzIsOpen and IsOpenEnd(horzEdge) then
     begin
       if IsHotEdge(horzEdge) then
+      begin
         AddOutPt(horzEdge, horzEdge.Top);
+        if IsFront(horzEdge) then
+          horzEdge.OutRec.FrontE := nil else
+          horzEdge.OutRec.BackE := nil;
+        horzEdge.OutRec := nil;
+      end;
       DeleteFromAEL(horzEdge); //ie open at top
       Exit;
     end
@@ -3784,7 +3811,13 @@ begin
     if IsHotEdge(e) then AddOutPt(e, e.Top);
     if not IsHorizontal(e) then
     begin
-      if IsHotEdge(e) then e.OutRec := nil;
+      if IsHotEdge(e) then
+      begin
+        if IsFront(e) then
+          e.OutRec.FrontE := nil else
+          e.OutRec.BackE := nil;
+        e.OutRec := nil;
+      end;
       DeleteFromAEL(e);
     end;
     Exit;
@@ -3854,7 +3887,7 @@ begin
         //closed paths should always return a Positive orientation
         //except when ReverseSolution == true
         if BuildPath(outRec.Pts,
-          FReverseSolution = FOrientationIsReversed,
+          FReverseSolution <> FOrientationIsReversed,
           false, closedPaths[cntClosed]) then
             inc(cntClosed);
       end;
@@ -3872,7 +3905,8 @@ function PointInPolygon(const pt: TPoint64; ops: POutPt): TPointInPolygonResult;
 var
   val: Integer;
   d: Double; //used to avoid integer overflow
-  ptCurr, ptPrev: POutPt;
+  curr, prev: POutPt;
+  isAbove: Boolean;
 begin
   if (ops.Next = ops) or (ops.Next = ops.Prev) then
   begin
@@ -3882,52 +3916,60 @@ begin
 
   Result := pipOn;
   val := 0;
-  ptPrev := ops.Prev;
-  ptCurr := ops;
+  prev := ops.Prev;
+
+  prev.Next := nil; //temporarily break the link !!
+  curr := ops;
+  isAbove := prev.Pt.Y < pt.Y;
   repeat
-    if (ptPrev.Pt.Y = ptCurr.Pt.Y) then //a horizontal edge
+    if isAbove then
     begin
-      if (pt.Y = ptCurr.Pt.Y) and
-        ((pt.X = ptPrev.Pt.X) or (pt.X = ptCurr.Pt.X) or
-          ((pt.X < ptPrev.Pt.X) <> (pt.X < ptCurr.Pt.X))) then Exit;
-    end
-    else if (ptPrev.Pt.Y < ptCurr.Pt.Y) then
-    begin
-      //nb: only allow one equality with Y to avoid
-      //double counting when pt.Y == ptCurr.Pt.Y
-      if (pt.Y > ptPrev.Pt.Y) and (pt.Y <= ptCurr.Pt.Y) and
-        ((pt.X >= ptPrev.Pt.X) or (pt.X >= ptCurr.Pt.X)) then
-      begin
-        if((pt.X > ptPrev.Pt.X) and (pt.X > ptCurr.Pt.X)) then
-          val := 1 - val //toggles val between 0 and 1
-        else
-        begin
-          d := CrossProduct(ptPrev.Pt, ptCurr.Pt, pt);
-          if d = 0 then Exit
-          else if d > 0 then val := 1 - val;
-        end;
-      end;
+      while Assigned(curr) and (curr.Pt.Y < pt.Y) do
+        curr := curr.Next;
+      if not Assigned(curr) then break;
     end else
     begin
-      if (pt.Y > ptCurr.Pt.Y) and (pt.Y <= ptPrev.Pt.Y) and
-        ((pt.X >= ptCurr.Pt.X) or (pt.X >= ptPrev.Pt.X)) then
-      begin
-        if((pt.X > ptPrev.Pt.X) and (pt.X > ptCurr.Pt.X)) then
-          val := 1 - val //toggles val between 0 and 1
-        else
-        begin
-          d := CrossProduct(ptCurr.Pt, ptPrev.Pt, pt);
-          if d = 0 then Exit
-          else if d > 0 then val := 1 - val;
-        end;
-      end;
+      while Assigned(curr) and (curr.Pt.Y > pt.Y) do
+        curr := curr.Next;
+      if not Assigned(curr) then break;
     end;
-    ptPrev := ptCurr;
-    ptCurr := ptCurr.Next;
-  until ptCurr = ops;
+    prev := curr.Prev;
+
+    if (curr.Pt.Y = pt.Y) then
+    begin
+      if (curr.Pt.X = pt.X) or ((curr.Pt.Y = prev.Pt.Y) and
+        ((pt.X < prev.Pt.X) <> (pt.X < curr.Pt.X))) then
+      begin
+        //ie point on path
+        ops.Prev.Next := ops; //reestablish the link
+        Exit;
+      end;
+      curr := curr.Next;
+      Continue;
+    end;
+
+    if (pt.X < curr.Pt.X) and (pt.X < prev.Pt.X) then
+      //we're only interested in edges crossing on the left
+    else if((pt.X > prev.Pt.X) and (pt.X > curr.Pt.X)) then
+      val := 1 - val //toggle val
+    else
+    begin
+      d := CrossProduct(prev.Pt, curr.Pt, pt);
+      if d = 0 then
+      begin
+        //ie point on path
+        ops.Prev.Next := ops; //reestablish the link
+        Exit;
+      end;
+      if (d < 0) = isAbove then val := 1 - val;
+    end;
+    isAbove := not isAbove;
+    curr := curr.Next;
+  until not Assigned(curr);
   if val = 0 then
      result := pipOutside else
      result := pipInside;
+  ops.Prev.Next := ops; //reestablish the link
 end;
 //------------------------------------------------------------------------------
 
@@ -4006,7 +4048,7 @@ begin
       //closed paths should always return a Positive orientation
       //except when ReverseSolution == true
       if not BuildPath(outRec.Pts,
-        FReverseSolution = FOrientationIsReversed, false, path) then
+        FReverseSolution <> FOrientationIsReversed, false, path) then
           Continue;
 
       if assigned(outRec.Owner) and
@@ -4092,6 +4134,7 @@ function TClipper64.Execute(clipType: TClipType;
 var
   dummy: TPaths64;
 begin
+  FUsingPolytree := false;
   closedSolutions := nil;
   try try
     ExecuteInternal(clipType, fillRule, false);
@@ -4111,6 +4154,7 @@ function TClipper64.Execute(clipType: TClipType; fillRule: TFillRule;
 begin
   closedSolutions := nil;
   openSolutions := nil;
+  FUsingPolytree := false;
   try try
     ExecuteInternal(clipType, fillRule, false);
     BuildPaths(closedSolutions, openSolutions);
@@ -4130,6 +4174,7 @@ begin
   if not assigned(solutionTree) then
     Raise EClipperLibException(rsClipper_PolyTreeErr);
   solutionTree.Clear;
+  FUsingPolytree := true;
   openSolutions := nil;
   try try
     ExecuteInternal(clipType, fillRule, true);
@@ -4348,6 +4393,7 @@ var
 begin
   if not assigned(solutionsTree) then RaiseError(rsClipper_PolyTreeErr);
   solutionsTree.Clear;
+  FUsingPolytree := true;
   solutionsTree.SetScale(fScale);
   openSolutions := nil;
   try try
