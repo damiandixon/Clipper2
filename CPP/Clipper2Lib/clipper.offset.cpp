@@ -67,8 +67,8 @@ void ClipperOffset::AddPath(const Path64& path, JoinType jt_, EndType et_)
 
 void ClipperOffset::AddPaths(const Paths64 &paths, JoinType jt_, EndType et_)
 {
-	if (paths.size() == 0) return;
-	groups_.push_back(PathGroup(paths, jt_, et_));
+  if (paths.empty()) return;
+	groups_.emplace_back(PathGroup(paths, jt_, et_));
 }
 
 void ClipperOffset::AddPath(const Clipper2Lib::PathD& path, JoinType jt_, EndType et_)
@@ -80,38 +80,38 @@ void ClipperOffset::AddPath(const Clipper2Lib::PathD& path, JoinType jt_, EndTyp
 
 void ClipperOffset::AddPaths(const PathsD& paths, JoinType jt_, EndType et_)
 {
-	if (paths.size() == 0) return;
-	groups_.push_back(PathGroup(PathsDToPaths64(paths), jt_, et_));
+  if (paths.empty()) return;
+	groups_.emplace_back(PathGroup(PathsDToPaths64(paths), jt_, et_));
 }
 
 void ClipperOffset::BuildNormals(const Path64& path)
 {
 	norms.clear();
+	if (path.empty()) return;
 	norms.reserve(path.size());
-	if (path.size() == 0) return;
 	Path64::const_iterator path_iter, path_last_iter = --path.cend();
 	for (path_iter = path.cbegin(); path_iter != path_last_iter; ++path_iter)
-		norms.push_back(GetUnitNormal(*path_iter,*(path_iter +1)));
-	norms.push_back(GetUnitNormal(*path_last_iter, *(path.cbegin())));
+		norms.emplace_back(GetUnitNormal(*path_iter,*(path_iter +1)));
+	norms.emplace_back(GetUnitNormal(*path_last_iter, *(path.cbegin())));
 }
 
 void ClipperOffset::DoSquare(PathGroup& group, const Path64& path, size_t j, size_t k)
 {
 	if (delta_ > 0)
 	{
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x + delta_ * (norms[k].x - norms[k].y),
 			path[j].y + delta_ * (norms[k].y + norms[k].x)));
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x + delta_ * (norms[j].x + norms[j].y),
 			path[j].y + delta_ * (norms[j].y - norms[j].x)));
 	}
 	else
 	{
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x + delta_ * (norms[k].x + norms[k].y),
 			path[j].y + delta_ * (norms[k].y - norms[k].x)));
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x + delta_ * (norms[j].x - norms[j].y),
 			path[j].y + delta_ * (norms[j].y + norms[j].x)));
 	}
@@ -120,7 +120,7 @@ void ClipperOffset::DoSquare(PathGroup& group, const Path64& path, size_t j, siz
 void ClipperOffset::DoMiter(PathGroup& group, const Path64& path, size_t j, size_t k, double cos_a)
 {
 	double q = delta_ / (cos_a + 1);
-	group.path_.push_back(Point64(
+	group.path_.emplace_back(Point64(
 		path[j].x + (norms[k].x + norms[j].x) * q,
 		path[j].y + (norms[k].y + norms[j].y) * q));
 }
@@ -129,19 +129,19 @@ void ClipperOffset::DoRound(PathGroup& group, const Point64& pt,
 	const PointD& norm1, const PointD& norm2, double angle)
 {
 	//even though angle may be negative this is a convex join
-	PointD pt2 = PointD(norm2.x * delta_, norm2.y * delta_);
+	PointD pt2(norm2.x * delta_, norm2.y * delta_);
 	int steps = static_cast<int>(std::round(steps_per_rad_ * std::abs(angle) + 0.501));
-	group.path_.push_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
+	group.path_.emplace_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
 	double step_sin = std::sin(angle / steps);
 	double step_cos = std::cos(angle / steps);
 	for (int i = 0; i < steps; i++)
 	{
 		pt2 = PointD(pt2.x * step_cos - step_sin * pt2.y,
 			pt2.x * step_sin + pt2.y * step_cos);
-		group.path_.push_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
+		group.path_.emplace_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
 	}
 	pt2 = PointD(norm1.x * delta_, norm1.y * delta_);
-	group.path_.push_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
+	group.path_.emplace_back(Point64(pt.x + pt2.x, pt.y + pt2.y));
 }
 
 void ClipperOffset::OffsetPoint(PathGroup& group, Path64& path, size_t j, size_t& k)
@@ -218,10 +218,10 @@ void ClipperOffset::OffsetOpenPath(PathGroup& group, Path64& path, EndType end_t
 	switch (end_type)
 	{
 	case EndType::Butt:
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x + norms[k].x * delta_,
 			path[j].y + norms[k].y * delta_));
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[j].x - norms[k].x * delta_,
 			path[j].y - norms[k].y * delta_));
 		break;
@@ -245,10 +245,10 @@ void ClipperOffset::OffsetOpenPath(PathGroup& group, Path64& path, EndType end_t
 	switch (end_type)
 	{
 	case EndType::Butt:
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[0].x + norms[1].x * delta_,
 			path[0].y + norms[1].y * delta_));
-		group.path_.push_back(Point64(
+		group.path_.emplace_back(Point64(
 			path[0].x - norms[1].x * delta_,
 			path[0].y - norms[1].y * delta_));
 		break;
@@ -300,7 +300,7 @@ void ClipperOffset::DoGroupOffset(PathGroup& group, double delta)
 	for(path_iter = group.paths_in_.cbegin(); path_iter != group.paths_in_.cend(); ++path_iter)
 	{
 		Path64 path = StripDuplicates(*path_iter, is_closed_path);
-		Path64::size_type cnt = path.size();
+		const Path64::size_type cnt = path.size();
 		if (cnt == 0) continue;
 
 		if (cnt == 1) //single point - only valid with open paths
@@ -316,10 +316,10 @@ void ClipperOffset::DoGroupOffset(PathGroup& group, double delta)
 			else
 			{
 				group.path_.reserve(4);
-				group.path_.push_back(Point64(path[0].x - delta_, path[0].y - delta_));
-				group.path_.push_back(Point64(path[0].x + delta_, path[0].y - delta_));
-				group.path_.push_back(Point64(path[0].x + delta_, path[0].y + delta_));
-				group.path_.push_back(Point64(path[0].x - delta_, path[0].y + delta_));
+				group.path_.emplace_back(Point64(path[0].x - delta_, path[0].y - delta_));
+				group.path_.emplace_back(Point64(path[0].x + delta_, path[0].y - delta_));
+				group.path_.emplace_back(Point64(path[0].x + delta_, path[0].y + delta_));
+				group.path_.emplace_back(Point64(path[0].x - delta_, path[0].y + delta_));
 			}
 			group.paths_out_.push_back(group.path_);
 		}
@@ -374,8 +374,8 @@ Paths64 ClipperOffset::Execute(double delta)
 	{
 		DoGroupOffset(*groups_iter, delta);
 	}
-
-	if (merge_groups_ && groups_.size() > 0)
+  
+	if (merge_groups_ && !groups_.empty())
 	{
 		//clean up self-intersections ...
 		Clipper c(false);
