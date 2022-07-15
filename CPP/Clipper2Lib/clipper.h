@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  2 July 2022                                                     *
+* Date      :  12 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This module provides a simple interface to the Clipper Library  *
@@ -441,15 +441,21 @@ namespace Clipper2Lib
   }
 
   template <typename T>
-  inline PointInPolyResult PointInPolygon(const Point<T>& pt, const Path<T>& polygon)
+  inline PointInPolygonResult PointInPolygon(const Point<T>& pt, const Path<T>& polygon)
   {
     if (polygon.size() < 3) 
-      return PointInPolyResult::IsOutside;
+      return PointInPolygonResult::IsOutside;
 
     int val = 0;
-    typename Path<T>::const_iterator cit = polygon.cbegin();
+    typename Path<T>::const_iterator start = polygon.cbegin(), cit = start;
     typename Path<T>::const_iterator cend = polygon.cend(), pit = cend -1;
-    bool is_above = pit->y < pt.y, first_pass = true;
+
+    while (pit->y == pt.y)
+    {
+      if (pit == start) return PointInPolygonResult::IsOutside;
+      --pit;
+    }
+    bool is_above = pit->y < pt.y;
 
     while (cit != cend)
     {
@@ -464,19 +470,14 @@ namespace Clipper2Lib
         if (cit == cend) break;
       }
 
-      if (first_pass)
-      {
-        if (cit != polygon.cbegin()) pit = cit - 1;
-        first_pass = false;
-      }
-      else 
-        pit = cit - 1;
+      if (cit == start) pit = cend - 1;
+      else  pit = cit - 1;
 
       if (cit->y == pt.y)
       {
         if (cit->x == pt.x || (cit->y == pit->y &&
           ((pt.x < pit->x) != (pt.x < pit->x))))
-          return PointInPolyResult::IsOn;
+          return PointInPolygonResult::IsOn;
         cit++;
         continue;
       }
@@ -491,7 +492,7 @@ namespace Clipper2Lib
       {
         double d = CrossProduct(*pit, *cit, pt);
         if (d == 0)
-          return PointInPolyResult::IsOn;
+          return PointInPolygonResult::IsOn;
         else if ((d < 0) == is_above) 
           val  = 1 - val;
       }      
@@ -499,9 +500,9 @@ namespace Clipper2Lib
       cit++;
     }
     if (val == 0)
-      return PointInPolyResult::IsOutside;
+      return PointInPolygonResult::IsOutside;
     else
-      return PointInPolyResult::IsInside;
+      return PointInPolygonResult::IsInside;
   }
 
   template <typename T>
