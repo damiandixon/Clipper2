@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  26 June 2022                                                    *
+* Date      :  14 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -32,7 +32,7 @@ namespace Clipper2Lib {
 	//Note: all clipping operations except for Difference are commutative.
 	enum class ClipType { None, Intersection, Union, Difference, Xor };
 	
-	enum class PointInPolyResult { IsOn, IsInside, IsOutside };
+	enum class PointInPolygonResult { IsOn, IsInside, IsOutside };
 
 	enum class PathType { Subject, Clip };
 
@@ -75,8 +75,6 @@ namespace Clipper2Lib {
 		}
 	};
 
-	enum class OutRecState { Undefined = 0, Open = 1, Outer = 2, Inner = 4};
-
 	template <typename T>
 	class PolyPath;
 
@@ -101,7 +99,7 @@ namespace Clipper2Lib {
 		Active* back_edge = nullptr;
 		OutPt* pts = nullptr;
 		PolyPath64* polypath = nullptr;
-		OutRecState state = OutRecState::Undefined;
+		bool is_open = false;
 		~OutRec() { if (splits) delete splits; };
 	};
 
@@ -132,7 +130,7 @@ namespace Clipper2Lib {
 		Active* next_in_sel = nullptr;
 		Active* jump = nullptr;
 		Vertex* vertex_top = nullptr;
-		LocalMinima* local_min = nullptr;  //the bottom of an edge 'bound' (also Vatti)
+		LocalMinima* local_min = nullptr;  // the bottom of an edge 'bound' (also Vatti)
 		bool is_left_bound = false;
 	};
 
@@ -222,9 +220,8 @@ namespace Clipper2Lib {
 		void DoTopOfScanbeam(const int64_t top_y);
 		Active *DoMaxima(Active &e);
 		void JoinOutrecPaths(Active &e1, Active &e2);
-		bool FixSides(Active& e, Active& e2);
 		void CompleteSplit(OutPt* op1, OutPt* op2, OutRec& outrec);
-		bool ValidateClosedPathEx(OutRec* outrec);
+		bool ValidateClosedPathEx(OutPt*& outrec);
 		void CleanCollinear(OutRec* outrec);
 		void FixSelfIntersects(OutRec* outrec);
 		OutPt* DoSplitOp(OutPt* outRecOp, OutPt* splitOp);
@@ -243,12 +240,12 @@ namespace Clipper2Lib {
 		void BuildPaths(Paths64& solutionClosed, Paths64* solutionOpen);
 		void BuildTree(PolyPath64& polytree, Paths64& open_paths);
 #ifdef USINGZ
-		ZFillCallback zfill_func_; //custom callback 
+		ZFillCallback zfill_func_; // custom callback 
 		void SetZ(const Active& e1, const Active& e2, Point64& pt);
 #endif
 	protected:
 		bool orientation_is_reversed_ = true;
-		void CleanUp();  //unlike Clear, CleanUp preserves added paths
+		void CleanUp();  // unlike Clear, CleanUp preserves added paths
 		void AddPath(const Path64& path, PathType polytype, bool is_open);
 		void AddPaths(const Paths64& paths, PathType polytype, bool is_open);
 
@@ -302,7 +299,7 @@ namespace Clipper2Lib {
 			scale_(parent->scale_), polygon_(path), parent_(parent){}
 	public:
 
-		explicit PolyPath(int precision = 0) //NB only for root node
+		explicit PolyPath(int precision = 0) // NB only for root node
 		{  
 			scale_ = std::pow(10, precision);
 			parent_ = nullptr;
@@ -336,7 +333,8 @@ namespace Clipper2Lib {
 
 		const PolyPath<T>* parent() const { return parent_; }
 
-		bool IsHole() const {
+		bool IsHole() const 
+		{
 			const PolyPath* pp = parent_;
 			bool is_hole = pp;
 			while (pp) {
@@ -455,8 +453,6 @@ namespace Clipper2Lib {
 
 	};
 
-	using Clipper = Clipper64;
-
 }  // namespace 
 
-#endif  //clipper_engine_h
+#endif  // clipper_engine_h

@@ -2,8 +2,6 @@
 #include "../../Clipper2Lib/clipper.h"
 #include "../../Utils/ClipFileLoad.h"
 
-using namespace Clipper2Lib;
-
 TEST(Clipper2Tests, TestMultiplePolygons)
 {
 #ifdef _WIN32
@@ -19,23 +17,23 @@ TEST(Clipper2Tests, TestMultiplePolygons)
 
   while (true)
   {
-    Paths64 subject, subject_open, clip;
-    Paths64 solution, solution_open;
-    ClipType ct;
-    FillRule fr;
+    Clipper2Lib::Paths64 subject, subject_open, clip;
+    Clipper2Lib::Paths64 solution, solution_open;
+    Clipper2Lib::ClipType ct;
+    Clipper2Lib::FillRule fr;
     int64_t area, count;
 
-    if (!LoadTestNum(ifs, test_number, false,
+    if (!LoadTestNum(ifs, test_number, 
       subject, subject_open, clip, area, count, ct, fr)) break;
    
-    Clipper64 c;
+    Clipper2Lib::Clipper64 c;
     c.AddSubject(subject);
     c.AddOpenSubject(subject_open);
     c.AddClip(clip);
     c.Execute(ct, fr, solution, solution_open);
 
     const int64_t area2 = static_cast<int64_t>(Area(solution));
-    const int64_t count2 = solution.size() + solution_open.size();
+    const int64_t count2 = static_cast<int64_t>(solution.size() + solution_open.size());
     const int64_t count_diff = std::abs(count2 - count);
     const int64_t area_diff = std::abs(area2 - area);
     const double relative_count_diff = count ? count_diff / static_cast<double>(count) : 0;
@@ -60,10 +58,15 @@ TEST(Clipper2Tests, TestMultiplePolygons)
       EXPECT_LE(count_diff, 1);
       EXPECT_LE(relative_count_diff, 0.01);
     }
+    else if (test_number == 22)
+    {
+      EXPECT_LE(count2, 2);
+      EXPECT_LE(area2, 2);
+    }
     else if (test_number == 23)
     {
-      EXPECT_EQ(count, count2);
-      EXPECT_LE(area_diff, 2);
+      EXPECT_LE(count2, 1);
+      EXPECT_LE(area2, 2);
     }
     else if (test_number == 27)
     {
@@ -92,28 +95,34 @@ TEST(Clipper2Tests, TestMultiplePolygons)
     }
     else if (test_number < 160)
     {
-      EXPECT_LE(count_diff, 2);
-      if (count > 0) EXPECT_LE(relative_count_diff, 0.02);
-      else           EXPECT_EQ(count2, 0);
+      if (count > 50) EXPECT_LE(relative_count_diff, 0.02);
+      else EXPECT_LE(count_diff, 2);
       if (area > 0)  EXPECT_LE(relative_area_diff, 0.035);
       else           EXPECT_EQ(area, 0);
     }
+    else if (test_number == 168)
+    {
+      EXPECT_LE(count_diff, 9);
+      EXPECT_LE(relative_count_diff, 0.1);
+      EXPECT_LE(relative_area_diff, 0.0005);
+    }
     else if (test_number == 183)
     {
-      EXPECT_LE(count_diff, 1);
+      EXPECT_LE(count_diff, 2);
       EXPECT_EQ(area_diff, 0);
     }
     else
     {
       EXPECT_LE(count_diff, 8);
-      EXPECT_LE(relative_count_diff, 0.1);
+      if (count_diff > 1) 
+        EXPECT_LE(relative_count_diff, 0.1);
       EXPECT_LE(relative_area_diff, 0.0005);
     }
 
     // Make sure that the polytree variant gives results similar to the paths-only version.
-    PolyTree64 solution_polytree;
-    Paths64 solution_polytree_open;
-    Clipper64 clipper_polytree;
+    Clipper2Lib::PolyTree64 solution_polytree;
+    Clipper2Lib::Paths64 solution_polytree_open;
+    Clipper2Lib::Clipper64 clipper_polytree;
     clipper_polytree.AddSubject(subject);
     clipper_polytree.AddOpenSubject(subject_open);
     clipper_polytree.AddClip(clip);
@@ -125,7 +134,7 @@ TEST(Clipper2Tests, TestMultiplePolygons)
     const auto count3 = solution_polytree_paths.size() + solution_polytree_open.size();
 
     EXPECT_EQ(area2, area3);
-    EXPECT_NEAR(static_cast<double>(count2), static_cast<double>(count3), 1.01);
+    EXPECT_EQ(count2, count3);
 
     ++test_number;
   }
