@@ -34,7 +34,7 @@ add_library(Clipper2utils SHARED
   Utils/ClipFileSave.cpp
   Utils/ClipFileSave.h
 )
-target_link_libraries(Clipper2utils PRIVATE -lm)
+target_link_libraries(Clipper2utils PRIVATE -lm Clipper2)
 set_target_properties(Clipper2utils PROPERTIES LINKER_LANGUAGE CXX)
 set_target_properties(Clipper2utils PROPERTIES LINK_FLAGS "-Wl,-rpath,${CMAKE_SOURCE_DIR}/lib")
 target_include_directories(Clipper2utils
