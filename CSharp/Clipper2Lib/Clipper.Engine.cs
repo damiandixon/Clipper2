@@ -1,7 +1,7 @@
 ﻿/*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  Clipper2 - beta                                                 *
-* Date      :  28 July 2022                                                    *
+* Date      :  31 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -933,15 +933,15 @@ namespace Clipper2Lib
       {
         case FillRule.Positive:
           isInSubj = ae.windCount > 0;
-          isInClip = ae.windCount > 0;
+          isInClip = ae.windCount2 > 0;
           break;
         case FillRule.Negative:
           isInSubj = ae.windCount < 0;
-          isInClip = ae.windCount < 0;
+          isInClip = ae.windCount2 < 0;
           break;
         default:
           isInSubj = ae.windCount != 0;
-          isInClip = ae.windCount != 0;
+          isInClip = ae.windCount2 != 0;
           break;
       }
 
@@ -3027,6 +3027,11 @@ namespace Clipper2Lib
             {
               or1.pts = op1;
               or2.pts = null;
+              if (or1.owner != null &&
+                (or2.owner == null || or2.owner.idx < or1.owner.idx))
+              {
+                or1.owner = or2.owner;
+              }
               or2.owner = or1;
             }
             else
@@ -3034,6 +3039,11 @@ namespace Clipper2Lib
               result = or2;
               or2.pts = op1;
               or1.pts = null;
+              if (or2.owner != null &&
+                (or1.owner == null || or1.owner.idx < or2.owner.idx))
+              {
+                or2.owner = or1.owner;
+              }
               or1.owner = or2;
             }
           }
@@ -3081,6 +3091,11 @@ namespace Clipper2Lib
             {
               or1.pts = op1;
               or2.pts = null;
+              if (or1.owner != null &&
+                (or2.owner == null || or2.owner.idx < or1.owner.idx))
+              {
+                or1.owner = or2.owner;
+              }
               or2.owner = or1;
             }
             else
@@ -3088,6 +3103,11 @@ namespace Clipper2Lib
               result = or2;
               or2.pts = op1;
               or1.pts = null;
+              if (or2.owner != null &&
+                (or1.owner == null || or1.owner.idx < or2.owner.idx))
+              {
+                or2.owner = or1.owner;
+              }
               or1.owner = or2;
             }
           }
@@ -3298,7 +3318,7 @@ namespace Clipper2Lib
       OutPt op2 = op;
       for (; ; )
       {
-        // 3 edged polygons can't self-intersect
+        // triangles can't self-intersect
         if (op2.prev == op2.next!.next) break;
         if (InternalClipper.SegmentsIntersect(op2.prev.pt,
                 op2.pt, op2.next.pt, op2.next.next!.pt))
