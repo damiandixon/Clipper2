@@ -1,7 +1,7 @@
 /*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  29 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.0                                            *
+* Date      :  3 August 2022                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -656,7 +656,7 @@ namespace Clipper2Lib {
 
 			v->prev = nullptr;
 			int cnt = 0;
-			for (const Point64 pt : path)
+			for (const Point64& pt : path)
 			{
 				if (prev_v)
 				{
@@ -2087,6 +2087,16 @@ namespace Clipper2Lib {
 	}
 
 
+	bool ClipperBase::Execute(ClipType clip_type, FillRule fill_rule, PolyTree64& polytree)
+	{
+		Paths64 dummy;
+		polytree.Clear();
+		if (ExecuteInternal(clip_type, fill_rule, true))
+			BuildTree(polytree, dummy);
+		CleanUp();
+		return succeeded_;
+	}
+
 	bool ClipperBase::Execute(ClipType clip_type,
 		FillRule fill_rule, PolyTree64& polytree, Paths64& solution_open)
 	{
@@ -3481,10 +3491,10 @@ namespace Clipper2Lib {
 
 	static void PolyPath64ToPolyPathD(const PolyPath64& polypath, PolyPathD& result)
 	{
-		for (const PolyPath64* child : polypath.childs())
+		for (auto child : polypath)
 		{
 			PolyPathD* res_child = result.AddChild(
-				Path64ToPathD(child->polygon()));
+				Path64ToPathD(child->Polygon()));
 			PolyPath64ToPolyPathD(*child, *res_child);
 		}
 	}
